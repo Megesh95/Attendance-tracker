@@ -1,0 +1,29 @@
+# --- React Native / Expo (attendance-tracker) ---
+attendance-tracker/node_modules/
+attendance-tracker/.expo/
+attendance-tracker/dist/
+attendance-tracker/web-build/
+attendance-tracker/expo-env.d.ts
+attendance-tracker/.kotlin/
+attendance-tracker/.metro-health-check*
+attendance-tracker/npm-debug.*
+attendance-tracker/yarn-debug.*
+attendance-tracker/yarn-error.*
+attendance-tracker/*.tsbuildinfo
+attendance-tracker/app-example
+attendance-tracker/ios/
+attendance-tracker/android/
+
+# --- .NET (AttendanceTrackerAPI) ---
+AttendanceTrackerAPI/bin/
+AttendanceTrackerAPI/obj/
+AttendanceTrackerAPI/*.user
+AttendanceTrackerAPI/.vs/
+AttendanceTrackerAPI/.idea/
+AttendanceTrackerAPI/appsettings.*.local.json
+AttendanceTrackerAPI/secrets.json
+
+# --- OS / IDE ---
+.DS_Store
+*.pem
+Thumbs.db

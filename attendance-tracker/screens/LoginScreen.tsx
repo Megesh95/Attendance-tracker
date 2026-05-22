@@ -1,0 +1,184 @@
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+type LoginScreenProps = {
+  onLoginSuccess?: () => void;
+};
+
+export default function LoginScreen({
+  onLoginSuccess,
+}: LoginScreenProps) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = () => {
+    if (!email || !password) {
+      alert('Please enter email and password');
+      return;
+    }
+
+    if (
+      email === 'admin@gmail.com' &&
+      password === '123456'
+    ) {
+      onLoginSuccess?.();
+    } else {
+      alert('Invalid Credentials');
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={
+          Platform.OS === 'ios'
+            ? 'padding'
+            : undefined
+        }
+      >
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.title}>
+              Attendance Tracker
+            </Text>
+
+            <Text style={styles.subtitle}>
+              Employee Login
+            </Text>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Email
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="you@company.com"
+                placeholderTextColor="#9CA3AF"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>
+                Password
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor="#9CA3AF"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.buttonText}>
+                Sign In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F8F7',
+  },
+
+  flex: {
+    flex: 1,
+  },
+
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+
+  header: {
+    marginBottom: 40,
+  },
+
+  title: {
+    fontSize: 34,
+    fontWeight: '700',
+    color: '#111111',
+    marginBottom: 8,
+    letterSpacing: -1,
+  },
+
+  subtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    lineHeight: 24,
+  },
+
+  form: {
+    width: '100%',
+  },
+
+  inputGroup: {
+    marginBottom: 20,
+  },
+
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 10,
+  },
+
+  input: {
+    height: 56,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#111111',
+  },
+
+  button: {
+    height: 56,
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
