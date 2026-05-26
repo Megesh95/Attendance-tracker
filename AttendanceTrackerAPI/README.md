@@ -4,9 +4,25 @@ ASP.NET Core 9 Web API for employee office attendance validation using GPS coord
 
 ## Endpoints
 
-- `POST /api/attendance/office` — Body: `{ "latitude": number, "longitude": number }`
+- `POST /api/attendance/office` — Body: `{ "employeeId": 1, "latitude": number, "longitude": number, "attendanceType": "Office" }`
+  - Persists a row in `Attendances` when GPS validation succeeds
   - Within 100 m of office → `{ "success": true, "message": "Attendance Marked" }`
   - Outside range → `400` with `{ "success": false, "message": "Outside Office Range" }`
+
+## Database (SQL Server)
+
+Connection string in `appsettings.json`:
+
+- Server: `localhost\SQLEXPRESS`
+- Database: `AttendanceTrackerDB`
+- Windows authentication + `TrustServerCertificate=True`
+
+Create/update the schema:
+
+```bash
+dotnet ef migrations add InitialCreate
+dotnet ef database update
+```
 
 ## Run locally
 

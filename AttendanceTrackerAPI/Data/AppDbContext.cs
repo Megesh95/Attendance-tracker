@@ -1,17 +1,75 @@
-using Microsoft.EntityFrameworkCore;
 using AttendanceTrackerAPI.Models;
+using Microsoft.EntityFrameworkCore;
 
-namespace AttendanceTrackerAPI.Data
+namespace AttendanceTrackerAPI.Data;
+
+public class AppDbContext : DbContext
 {
-    public class AppDbContext : DbContext
+    public AppDbContext(DbContextOptions<AppDbContext> options)
+        : base(options)
     {
-        public AppDbContext(
-            DbContextOptions<AppDbContext> options
-        ) : base(options)
-        {
-        }
+    }
 
-        public DbSet<Attendance> Attendances =>
-            Set<Attendance>();
+    public DbSet<Employee> Employees => Set<Employee>();
+
+    public DbSet<Attendance> Attendances => Set<Attendance>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Employee>(entity =>
+        {
+            entity.ToTable("Employees");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(e => e.Email)
+                .IsRequired()
+                .HasMaxLength(256);
+
+            entity.HasIndex(e => e.Email)
+                .IsUnique();
+
+            entity.Property(e => e.PasswordHash)
+                .IsRequired()
+                .HasMaxLength(512);
+
+            entity.Property(e => e.Role)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired();
+
+            entity.HasMany(e => e.Attendances)
+                .WithOne(a => a.Employee)
+                .HasForeignKey(a => a.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Attendance>(entity =>
+        {
+            entity.ToTable("Attendances");
+
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.AttendanceType)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(a => a.CheckInTime)
+                .IsRequired();
+
+            entity.Property(a => a.SelfieImagePath)
+                .HasMaxLength(500);
+
+            entity.HasIndex(a => a.EmployeeId);
+            entity.HasIndex(a => a.CheckInTime);
+        });
     }
 }
