@@ -12,6 +12,8 @@ import { router } from 'expo-router';
 import { isAxiosError } from 'axios';
 import * as Location from 'expo-location';
 import MapView, { Marker, type Region } from 'react-native-maps';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Image } from 'expo-image';
 
 import { useAttendance } from '@/contexts/AttendanceContext';
 import {
@@ -23,6 +25,7 @@ import {
   formatDistance,
   getAttendanceStatusLabel,
   getDistanceFromOffice,
+  isWithinOfficeRadius,
 } from '@/utils/location';
 
 const OFFICE_REGION: Region = {
@@ -35,16 +38,28 @@ const OFFICE_REGION: Region = {
 export default function OfficePunchScreen() {
   const { markOfficeCheckIn } = useAttendance();
   const mapRef = useRef<MapView>(null);
+  const cameraRef = useRef<CameraView>(null);
+
+  const [permission, requestPermission] = useCameraPermissions();
 
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [isRegistering, setIsRegistering] = useState(false);
 
+  const [cameraVisible, setCameraVisible] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState('Attendance Marked');
+
   const distanceMeters =
     latitude !== null && longitude !== null
       ? getDistanceFromOffice(latitude, longitude)
       : null;
+
+  const withinRange =
+    latitude !== null &&
+    longitude !== null &&
+    isWithinOfficeRadius(latitude, longitude);
 
   const statusLabel = getAttendanceStatusLabel(
     latitude,
@@ -111,9 +126,32 @@ export default function OfficePunchScreen() {
     loadLocation();
   }, [loadLocation]);
 
+  const openCameraAfterGpsSuccess = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert(
+          'Camera Permission Required',
+          'Please allow camera access to capture your attendance selfie.'
+        );
+        return;
+      }
+    }
+
+    setCameraVisible(true);
+  };
+
   const handleRegisterAttendance = async () => {
     if (latitude === null || longitude === null) {
       Alert.alert('Location Unavailable', 'Waiting for GPS coordinates.');
+      return;
+    }
+
+    if (!isWithinOfficeRadius(latitude, longitude)) {
+      Alert.alert(
+        'Outside Office Range',
+        'You must be within the office radius to register attendance.'
+      );
       return;
     }
 
@@ -123,10 +161,8 @@ export default function OfficePunchScreen() {
       const result = await punchOfficeAttendance(latitude, longitude);
 
       if (result.success) {
-        markOfficeCheckIn();
-        Alert.alert('Success', result.message, [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
+        setSuccessMessage(result.message);
+        await openCameraAfterGpsSuccess();
       } else {
         Alert.alert('Attendance Failed', result.message);
       }
@@ -147,6 +183,102 @@ export default function OfficePunchScreen() {
       setIsRegistering(false);
     }
   };
+
+  const capturePhoto = async () => {
+    try {
+      const photo = await cameraRef.current?.takePictureAsync({
+        quality: 0.85,
+      });
+
+      if (!photo?.uri) {
+        Alert.alert('Capture Failed', 'Could not capture selfie. Please try again.');
+        return;
+      }
+
+      setPhotoUri(photo.uri);
+      setCameraVisible(false);
+    } catch {
+      Alert.alert('Capture Failed', 'Could not capture selfie. Please try again.');
+    }
+  };
+
+  const retakePhoto = () => {
+    setPhotoUri(null);
+    setCameraVisible(true);
+  };
+
+  const completeAttendance = () => {
+    markOfficeCheckIn();
+    Alert.alert('Success', successMessage, [
+      { text: 'OK', onPress: () => router.back() },
+    ]);
+  };
+
+  if (photoUri) {
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.previewContainer} edges={['top', 'bottom']}>
+          <Text style={styles.previewTitle}>Selfie Preview</Text>
+          <Text style={styles.previewSubtitle}>
+            Confirm your photo to complete attendance
+          </Text>
+
+          <View style={styles.previewImageWrap}>
+            <Image
+              source={{ uri: photoUri }}
+              style={styles.previewImage}
+              contentFit="cover"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={completeAttendance}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.completeButtonText}>Complete Attendance</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.retakeButton}
+            onPress={retakePhoto}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.retakeButtonText}>Retake Selfie</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  if (cameraVisible) {
+    return (
+      <View style={styles.container}>
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing="front"
+        >
+          <SafeAreaView style={styles.cameraOverlay} edges={['top', 'bottom']}>
+            <Text style={styles.cameraTitle}>Attendance Selfie</Text>
+            <Text style={styles.cameraSubtitle}>
+              Position your face in the frame
+            </Text>
+
+            <View style={styles.cameraSpacer} />
+
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={capturePhoto}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.captureText}>Capture Selfie</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+        </CameraView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -224,19 +356,31 @@ export default function OfficePunchScreen() {
           </Text>
         </View>
 
-        <View style={styles.statusBox}>
+        <View
+          style={[
+            styles.statusBox,
+            withinRange ? styles.statusBoxInRange : styles.statusBoxOutOfRange,
+          ]}
+        >
           <Text style={styles.statusLabel}>Attendance status</Text>
-          <Text style={styles.statusValue}>{statusLabel}</Text>
+          <Text
+            style={[
+              styles.statusValue,
+              withinRange ? styles.statusValueInRange : styles.statusValueOutOfRange,
+            ]}
+          >
+            {statusLabel}
+          </Text>
         </View>
 
         <TouchableOpacity
           style={[
             styles.registerButton,
-            (isLoadingLocation || isRegistering) &&
+            (isLoadingLocation || isRegistering || !withinRange) &&
               styles.registerButtonDisabled,
           ]}
           onPress={handleRegisterAttendance}
-          disabled={isLoadingLocation || isRegistering}
+          disabled={isLoadingLocation || isRegistering || !withinRange}
           activeOpacity={0.9}
         >
           {isRegistering ? (
@@ -353,11 +497,16 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   statusBox: {
-    backgroundColor: '#F9FAFB',
     borderRadius: 12,
     padding: 14,
     marginTop: 14,
     marginBottom: 20,
+  },
+  statusBoxInRange: {
+    backgroundColor: '#ECFDF5',
+  },
+  statusBoxOutOfRange: {
+    backgroundColor: '#FEF2F2',
   },
   statusLabel: {
     fontSize: 12,
@@ -370,8 +519,13 @@ const styles = StyleSheet.create({
   statusValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
     lineHeight: 20,
+  },
+  statusValueInRange: {
+    color: '#047857',
+  },
+  statusValueOutOfRange: {
+    color: '#B91C1C',
   },
   registerButton: {
     height: 56,
@@ -387,5 +541,102 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+  },
+  cameraTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 8,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  cameraSubtitle: {
+    fontSize: 15,
+    color: '#F3F4F6',
+    textAlign: 'center',
+    marginTop: 6,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  cameraSpacer: {
+    flex: 1,
+  },
+  captureButton: {
+    height: 56,
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  captureText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  previewContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  previewTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  previewSubtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  previewImageWrap: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+    marginBottom: 24,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  completeButton: {
+    height: 56,
+    backgroundColor: '#111827',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  completeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  retakeButton: {
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  retakeButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
   },
 });

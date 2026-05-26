@@ -35,6 +35,12 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Attendance Tracker to use your camera to capture a selfie for attendance verification."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
