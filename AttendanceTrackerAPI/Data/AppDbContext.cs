@@ -46,6 +46,9 @@ public class AppDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .IsRequired();
 
+            entity.Property(e => e.ReferenceImagePath)
+                .HasMaxLength(255);
+
             entity.HasMany(e => e.Attendances)
                 .WithOne(a => a.Employee)
                 .HasForeignKey(a => a.EmployeeId)
@@ -65,11 +68,26 @@ public class AppDbContext : DbContext
             entity.Property(a => a.CheckInTime)
                 .IsRequired();
 
+            entity.Property(a => a.PunchTime)
+                .IsRequired();
+
+            entity.Property(a => a.ConfidenceScore);
+
+            entity.Property(a => a.Status)
+                .HasMaxLength(50);
+
+            entity.Property(a => a.FaceVerified)
+                .IsRequired();
+
+            entity.Property(a => a.LocationVerified)
+                .IsRequired();
+
             entity.Property(a => a.SelfieImagePath)
                 .HasMaxLength(500);
 
             entity.HasIndex(a => a.EmployeeId);
             entity.HasIndex(a => a.CheckInTime);
+            entity.HasIndex(a => a.PunchTime);
         });
     }
 }

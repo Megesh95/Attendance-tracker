@@ -1,6 +1,27 @@
 @AttendanceTrackerAPI_HostAddress = http://localhost:5162
 
-GET {{AttendanceTrackerAPI_HostAddress}}/weatherforecast/
-Accept: application/json
+### Login
+POST {{AttendanceTrackerAPI_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@gmail.com",
+  "password": "123456"
+}
+
+### Register face (reference selfie)
+# NOTE: Use multipart form-data in your client (VS Code REST client / Swagger UI).
+# Fields:
+# - employeeId (int)
+# - selfie (file)
+
+### Office attendance (GPS + selfie)
+# NOTE: Use multipart form-data.
+# Fields:
+# - employeeId (int)
+# - latitude (double)
+# - longitude (double)
+# - attendanceType (string, e.g. "Office")
+# - selfie (file)
 
 ###

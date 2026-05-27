@@ -1,11 +1,20 @@
 import { router } from 'expo-router';
 
 import LoginScreen from '@/screens/LoginScreen';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginRoute() {
+  const { setSession } = useAuth();
   return (
     <LoginScreen
-      onLoginSuccess={() => router.replace('/dashboard')}
+      onLoginSuccess={(session) => {
+        setSession(session);
+        if (!session.referenceImagePath) {
+          router.replace('/register-face');
+          return;
+        }
+        router.replace('/dashboard');
+      }}
     />
   );
 }

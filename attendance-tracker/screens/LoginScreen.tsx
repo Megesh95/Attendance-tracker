@@ -7,11 +7,23 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getAuthErrorMessage, login } from '@/services/authApi';
+
+type LoginSession = {
+  employeeId: number;
+  name: string;
+  email: string;
+  role: string;
+  referenceImagePath: string | null;
+};
+
 type LoginScreenProps = {
-  onLoginSuccess?: () => void;
+  onLoginSuccess?: (session: LoginSession) => void;
 };
 
 export default function LoginScreen({
@@ -19,20 +31,37 @@ export default function LoginScreen({
 }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (!email || !password) {
-      alert('Please enter email and password');
+  const handleLogin = async () => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
+      Alert.alert('Validation', 'Please enter email and password');
       return;
     }
 
-    if (
-      email === 'admin@gmail.com' &&
-      password === '123456'
-    ) {
-      onLoginSuccess?.();
-    } else {
-      alert('Invalid Credentials');
+    try {
+      setIsLoading(true);
+      const result = await login(trimmedEmail, password);
+
+      if (!result.success || !result.employeeId) {
+        Alert.alert('Login Failed', result.message ?? 'Invalid credentials');
+        return;
+      }
+
+      onLoginSuccess?.({
+        employeeId: result.employeeId,
+        name: result.name ?? 'Employee',
+        email: result.email ?? trimmedEmail,
+        role: result.role ?? 'Employee',
+        referenceImagePath:
+          result.referenceImagePath ?? null,
+      });
+    } catch (error) {
+      Alert.alert('Login Failed', getAuthErrorMessage(error));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -92,13 +121,16 @@ export default function LoginScreen({
             </View>
 
             <TouchableOpacity
-              style={styles.button}
+              style={[styles.button, isLoading && styles.buttonDisabled]}
               onPress={handleLogin}
               activeOpacity={0.9}
+              disabled={isLoading}
             >
-              <Text style={styles.buttonText}>
-                Sign In
-              </Text>
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.buttonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -174,6 +206,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
+  },
+
+  buttonDisabled: {
+    opacity: 0.7,
   },
 
   buttonText: {

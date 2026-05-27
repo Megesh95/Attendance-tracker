@@ -14,5 +14,8 @@ public class Employee
 
     public DateTime CreatedAt { get; set; }
 
+    // Employee registered biometric face reference image (nullable until first registration).
+    public string? ReferenceImagePath { get; set; }
+
     public ICollection<Attendance> Attendances { get; set; } = new List<Attendance>();
 }

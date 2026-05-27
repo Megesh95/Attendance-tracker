@@ -9,18 +9,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { isAxiosError } from 'axios';
 import * as Location from 'expo-location';
 import MapView, { Marker, type Region } from 'react-native-maps';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 
 import { useAttendance } from '@/contexts/AttendanceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   OFFICE_LATITUDE,
   OFFICE_LONGITUDE,
 } from '@/constants/office';
-import { punchOfficeAttendance } from '@/services/attendanceApi';
+import {
+  punchOfficeAttendanceWithSelfie,
+  getAttendanceErrorMessage,
+} from '@/services/attendanceApi';
 import {
   formatDistance,
   getAttendanceStatusLabel,
@@ -37,6 +40,7 @@ const OFFICE_REGION: Region = {
 
 export default function OfficePunchScreen() {
   const { markOfficeCheckIn } = useAttendance();
+  const { employeeId } = useAuth();
   const mapRef = useRef<MapView>(null);
   const cameraRef = useRef<CameraView>(null);
 
@@ -49,7 +53,6 @@ export default function OfficePunchScreen() {
 
   const [cameraVisible, setCameraVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState('Attendance Marked');
 
   const distanceMeters =
     latitude !== null && longitude !== null
@@ -157,28 +160,9 @@ export default function OfficePunchScreen() {
 
     try {
       setIsRegistering(true);
-
-      const result = await punchOfficeAttendance(latitude, longitude);
-
-      if (result.success) {
-        setSuccessMessage(result.message);
-        await openCameraAfterGpsSuccess();
-      } else {
-        Alert.alert('Attendance Failed', result.message);
-      }
-    } catch (error) {
-      if (isAxiosError(error)) {
-        const message =
-          (error.response?.data as { message?: string })?.message ??
-          'Unable to register attendance. Please try again.';
-
-        Alert.alert(
-          error.response ? 'Attendance Failed' : 'Network Error',
-          message
-        );
-      } else {
-        Alert.alert('Error', 'Something went wrong. Please try again.');
-      }
+      await openCameraAfterGpsSuccess();
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsRegistering(false);
     }
@@ -207,11 +191,42 @@ export default function OfficePunchScreen() {
     setCameraVisible(true);
   };
 
-  const completeAttendance = () => {
-    markOfficeCheckIn();
-    Alert.alert('Success', successMessage, [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+  const completeAttendance = async () => {
+    if (employeeId === null) {
+      Alert.alert('Session Error', 'Please log in again.');
+      router.replace('/');
+      return;
+    }
+
+    if (photoUri === null) {
+      Alert.alert('Photo Missing', 'Please capture a selfie first.');
+      return;
+    }
+
+    try {
+      setIsRegistering(true);
+
+      const result = await punchOfficeAttendanceWithSelfie({
+        employeeId,
+        latitude: latitude ?? 0,
+        longitude: longitude ?? 0,
+        selfieUri: photoUri,
+        attendanceType: 'Office',
+      });
+
+      if (result.success) {
+        markOfficeCheckIn();
+        Alert.alert('Success', result.message, [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert('Attendance Failed', result.message);
+      }
+    } catch (error) {
+      Alert.alert('Attendance Failed', getAttendanceErrorMessage(error));
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   if (photoUri) {
@@ -232,11 +247,21 @@ export default function OfficePunchScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.completeButton}
+            style={[
+              styles.completeButton,
+              isRegistering && styles.registerButtonDisabled,
+            ]}
             onPress={completeAttendance}
             activeOpacity={0.9}
+            disabled={isRegistering}
           >
-            <Text style={styles.completeButtonText}>Complete Attendance</Text>
+            {isRegistering ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.completeButtonText}>
+                Complete Attendance
+              </Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity

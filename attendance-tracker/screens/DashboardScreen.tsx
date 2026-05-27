@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { useAttendance } from '@/contexts/AttendanceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/constants/colors';
 
 const MAX_RECENT_ACTIVITY = 5;
@@ -64,6 +65,8 @@ export default function DashboardScreen({
     markOffSiteCheckIn,
   } = useAttendance();
 
+  const { employeeName } = useAuth();
+
   const isCheckedIn = attendanceStatus === 'Checked In';
   const recentActivity = attendanceHistory.slice(0, MAX_RECENT_ACTIVITY);
   const hasMoreHistory = attendanceHistory.length > MAX_RECENT_ACTIVITY;
@@ -116,7 +119,9 @@ export default function DashboardScreen({
               <Text style={styles.headerBadgeText}>Attendance</Text>
             </View>
             <Text style={styles.greeting}>{greeting}</Text>
-            <Text style={styles.name}>Employee</Text>
+            <Text style={styles.name}>
+              {employeeName ?? 'Employee'}
+            </Text>
             <Text style={styles.date}>{today}</Text>
           </View>
 
