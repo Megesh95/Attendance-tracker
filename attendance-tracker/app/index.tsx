@@ -11,9 +11,9 @@ export default function LoginRoute() {
         setSession(session);
         if (!session.referenceImagePath) {
           router.replace('/register-face');
-          return;
+        } else {
+          router.replace('/dashboard');
         }
-        router.replace('/dashboard');
       }}
     />
   );

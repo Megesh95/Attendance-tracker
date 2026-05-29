@@ -10,23 +10,20 @@ namespace AttendanceTrackerAPI.Controllers;
 [Route("api/[controller]")]
 public class AttendanceController : ControllerBase
 {
-    // private const double OfficeLat = 13.15227027680566;
-    // private const double OfficeLng = 77.55625239544804;
-    private const double OfficeLat = 12.78672089977720;
-    private const double OfficeLng = 77.8043905557959;
-    
+    private const double OfficeLat = 13.15227027680566;
+    private const double OfficeLng = 77.55625239544804;
+    // private const double OfficeLat = 12.78672089977720;
+    // private const double OfficeLng = 77.8043905557959;
 
     private const double OfficeRadiusMeters = 500;
 
     private readonly AppDbContext _context;
-    private readonly IDeepFaceVerifierService _faceVerifier;
+    private readonly IDeepFaceVerifierService _deepFaceVerifier;
 
-    public AttendanceController(
-        AppDbContext context,
-        IDeepFaceVerifierService faceVerifier)
+    public AttendanceController(AppDbContext context, IDeepFaceVerifierService deepFaceVerifier)
     {
         _context = context;
-        _faceVerifier = faceVerifier;
+        _deepFaceVerifier = deepFaceVerifier;
     }
 
     [HttpPost("office")]
@@ -71,16 +68,6 @@ public class AttendanceController : ControllerBase
             });
         }
 
-        if (string.IsNullOrWhiteSpace(employee.ReferenceImagePath))
-        {
-            return BadRequest(new
-            {
-                success = false,
-                message = "Reference face not registered"
-            });
-        }
-
-        // Save attendance selfie.
         var uploadsRoot = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
         var employeeDir = Path.Combine(uploadsRoot, "attendance", employee.Id.ToString());
         Directory.CreateDirectory(employeeDir);
@@ -98,25 +85,51 @@ public class AttendanceController : ControllerBase
             await selfie.CopyToAsync(stream);
         }
 
-        // DeepFace verification: reference vs attendance selfie.
-        DeepFaceVerificationResult verification;
-        try
-        {
-            verification = await _faceVerifier.VerifyAsync(
-                employee.ReferenceImagePath!,
-                selfiePath);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new
-            {
-                success = false,
-                message = "Face verification failed",
-                detail = ex.Message
-            });
-        }
+        bool faceVerified = false;
+        string attendanceStatus = "Rejected";
+        double? confidenceScore = null;
 
-        var status = verification.Verified ? "Approved" : "Rejected";
+        if (string.IsNullOrEmpty(employee.ReferenceImagePath))
+        {
+            // First time: Save as reference image
+            employee.ReferenceImagePath = selfiePath;
+            _context.Employees.Update(employee);
+            
+            faceVerified = true;
+            attendanceStatus = "Approved";
+        }
+        else
+        {
+            // Subsequent check-ins: Verify against reference
+            try
+            {
+                var result = await _deepFaceVerifier.VerifyAsync(employee.ReferenceImagePath, selfiePath, HttpContext.RequestAborted);
+                confidenceScore = result.ConfidenceScore;
+
+                if (result.Verified && confidenceScore >= 0.75)
+                {
+                    faceVerified = true;
+                    attendanceStatus = "Approved";
+                }
+                else
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Face verification failed. Attendance not recorded."
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // DeepFace script failed (e.g., no face detected)
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Face not detected. Please retake the selfie."
+                });
+            }
+        }
 
         var attendance = new Attendance
         {
@@ -127,23 +140,14 @@ public class AttendanceController : ControllerBase
             CheckInTime = punchTime,
             PunchTime = punchTime,
             LocationVerified = true,
-            FaceVerified = verification.Verified,
-            ConfidenceScore = verification.ConfidenceScore,
-            Status = status,
+            FaceVerified = faceVerified,
+            ConfidenceScore = confidenceScore,
+            Status = attendanceStatus,
             SelfieImagePath = selfiePath
         };
 
         _context.Attendances.Add(attendance);
         await _context.SaveChangesAsync();
-
-        if (!verification.Verified)
-        {
-            return BadRequest(new
-            {
-                success = false,
-                message = "Face not verified"
-            });
-        }
 
         return Ok(new
         {
@@ -173,5 +177,25 @@ public class AttendanceController : ControllerBase
         var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
         return R * c;
+    }
+
+    [HttpGet("history/{employeeId}")]
+    public async Task<IActionResult> GetHistory(int employeeId)
+    {
+        var records = await _context.Attendances
+            .Where(a => a.EmployeeId == employeeId)
+            .OrderByDescending(a => a.PunchTime)
+            .Select(a => new
+            {
+                a.PunchTime,
+                a.AttendanceType
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            success = true,
+            data = records
+        });
     }
 }

@@ -12,6 +12,8 @@ import { router } from 'expo-router';
 import { useAttendance } from '@/contexts/AttendanceContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { colors } from '@/constants/colors';
+import { getAttendanceHistory } from '@/services/attendanceApi';
+import { useEffect } from 'react';
 
 const MAX_RECENT_ACTIVITY = 5;
 
@@ -63,9 +65,50 @@ export default function DashboardScreen({
     attendanceInfo,
     attendanceHistory,
     markOffSiteCheckIn,
+    setHistory,
+    setTodayStatus,
   } = useAttendance();
 
-  const { employeeName } = useAuth();
+  const { employeeName, employeeId } = useAuth();
+
+  useEffect(() => {
+    if (employeeId) {
+      getAttendanceHistory(employeeId)
+        .then((response) => {
+          if (response.success && response.data) {
+            let latestTodayRecord: string | null = null;
+            const formattedHistory = response.data.map(
+              (record) => {
+                const date = new Date(record.punchTime);
+                const now = new Date();
+                const timeStr = date.toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+                
+                if (date.toDateString() === now.toDateString()) {
+                  if (!latestTodayRecord) {
+                    latestTodayRecord = `${timeStr} • ${record.attendanceType}`;
+                  }
+                  return `${timeStr} • ${record.attendanceType}`;
+                } else {
+                  const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                  return `${dateStr}, ${timeStr} • ${record.attendanceType}`;
+                }
+              }
+            );
+            setHistory(formattedHistory);
+            
+            if (latestTodayRecord) {
+              setTodayStatus('Checked In', latestTodayRecord);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to fetch attendance history', error);
+        });
+    }
+  }, [employeeId, setHistory, setTodayStatus]);
 
   const isCheckedIn = attendanceStatus === 'Checked In';
   const recentActivity = attendanceHistory.slice(0, MAX_RECENT_ACTIVITY);

@@ -63,3 +63,24 @@ export function getAttendanceErrorMessage(error: unknown): string {
   }
   return 'Something went wrong. Please try again.';
 }
+
+export type AttendanceRecord = {
+  punchTime: string;
+  attendanceType: string;
+};
+
+export type HistoryResponse = {
+  success: boolean;
+  data: AttendanceRecord[];
+};
+
+export async function getAttendanceHistory(
+  employeeId: number = DEFAULT_EMPLOYEE_ID
+): Promise<HistoryResponse> {
+  const { data } = await axios.get<HistoryResponse>(
+    `${API_BASE_URL}/api/attendance/history/${employeeId}`,
+    { timeout: 10000 }
+  );
+  return data;
+}
+

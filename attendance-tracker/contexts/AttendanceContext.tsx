@@ -14,6 +14,8 @@ type AttendanceContextValue = {
   markOfficeCheckIn: () => void;
   markOffSiteCheckIn: () => void;
   resetAttendance: () => void;
+  setHistory: (history: string[]) => void;
+  setTodayStatus: (status: string, info: string) => void;
 };
 
 const initialInfo =
@@ -61,6 +63,15 @@ export function AttendanceProvider({ children }: { children: ReactNode }) {
     setAttendanceHistory([]);
   }, []);
 
+  const setHistory = useCallback((history: string[]) => {
+    setAttendanceHistory(history);
+  }, []);
+
+  const setTodayStatus = useCallback((status: string, info: string) => {
+    setAttendanceStatus(status);
+    setAttendanceInfo(info);
+  }, []);
+
   const value = useMemo(
     () => ({
       attendanceStatus,
@@ -69,6 +80,8 @@ export function AttendanceProvider({ children }: { children: ReactNode }) {
       markOfficeCheckIn,
       markOffSiteCheckIn,
       resetAttendance,
+      setHistory,
+      setTodayStatus,
     }),
     [
       attendanceStatus,
@@ -77,6 +90,8 @@ export function AttendanceProvider({ children }: { children: ReactNode }) {
       markOfficeCheckIn,
       markOffSiteCheckIn,
       resetAttendance,
+      setHistory,
+      setTodayStatus,
     ]
   );
 
