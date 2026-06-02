@@ -9,7 +9,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddControllers();
-builder.Services.AddSingleton<IDeepFaceVerifierService, DeepFaceVerifierService>();
+builder.Services.AddHttpClient<IDeepFaceVerifierService, DeepFaceVerifierService>();
+builder.Services.AddHostedService<PythonServerHostedService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

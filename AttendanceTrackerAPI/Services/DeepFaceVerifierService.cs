@@ -1,16 +1,17 @@
-using System.Diagnostics;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
 
 namespace AttendanceTrackerAPI.Services;
 
 public sealed class DeepFaceVerifierService : IDeepFaceVerifierService
 {
-    private readonly IWebHostEnvironment _env;
+    private readonly HttpClient _httpClient;
 
-    public DeepFaceVerifierService(IWebHostEnvironment env)
+    public DeepFaceVerifierService(HttpClient httpClient)
     {
-        _env = env;
+        _httpClient = httpClient;
+        _httpClient.BaseAddress = new Uri("http://127.0.0.1:5000");
     }
 
     public async Task<DeepFaceVerificationResult> VerifyAsync(
@@ -18,60 +19,32 @@ public sealed class DeepFaceVerifierService : IDeepFaceVerifierService
         string selfieImagePath,
         CancellationToken cancellationToken = default)
     {
-        var scriptPath = Path.Combine(_env.ContentRootPath, "python", "verify_face.py");
-        if (!File.Exists(scriptPath))
+        var payload = new
         {
-            throw new FileNotFoundException("DeepFace verification script not found.", scriptPath);
-        }
-
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "python",
-            Arguments = $"\"{scriptPath}\" \"{referenceImagePath}\" \"{selfieImagePath}\"",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
+            reference_path = referenceImagePath,
+            selfie_path = selfieImagePath
         };
 
-        using var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+        var response = await _httpClient.PostAsJsonAsync("/verify", payload, cancellationToken);
+        response.EnsureSuccessStatusCode();
 
-        if (!process.Start())
-        {
-            throw new InvalidOperationException("Failed to start deepface python verification process.");
-        }
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
-        var stderrTask = process.StandardError.ReadToEndAsync();
-
-        await process.WaitForExitAsync(cancellationToken);
-
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-
-        if (process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"DeepFace verification failed (exit code {process.ExitCode}). Error: {stderr}");
-        }
-
-        var payload = JsonSerializer.Deserialize<JsonElement>(stdout);
-
-        var verified = payload.GetProperty("verified").GetBoolean();
+        var verified = result.GetProperty("verified").GetBoolean();
         double? distance = null;
-        if (payload.TryGetProperty("distance", out var distanceEl) && distanceEl.ValueKind != JsonValueKind.Null)
+        if (result.TryGetProperty("distance", out var distanceEl) && distanceEl.ValueKind != JsonValueKind.Null)
         {
             distance = distanceEl.GetDouble();
         }
 
         double? confidenceScore = null;
-        if (payload.TryGetProperty("confidenceScore", out var confidenceEl) && confidenceEl.ValueKind != JsonValueKind.Null)
+        if (result.TryGetProperty("confidenceScore", out var confidenceEl) && confidenceEl.ValueKind != JsonValueKind.Null)
         {
             confidenceScore = confidenceEl.GetDouble();
         }
 
         double? threshold = null;
-        if (payload.TryGetProperty("threshold", out var thresholdEl) && thresholdEl.ValueKind != JsonValueKind.Null)
+        if (result.TryGetProperty("threshold", out var thresholdEl) && thresholdEl.ValueKind != JsonValueKind.Null)
         {
             threshold = thresholdEl.GetDouble();
         }
