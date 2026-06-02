@@ -18,3 +18,6 @@ obj/
 ## Secrets (never commit)
 appsettings.*.local.json
 secrets.json
+
+## Uploads
+uploads/
