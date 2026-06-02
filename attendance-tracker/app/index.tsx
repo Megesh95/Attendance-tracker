@@ -9,7 +9,9 @@ export default function LoginRoute() {
     <LoginScreen
       onLoginSuccess={(session) => {
         setSession(session);
-        if (!session.referenceImagePath) {
+        if (session.role === 'Admin') {
+          router.replace('/admin-dashboard');
+        } else if (!session.referenceImagePath) {
           router.replace('/register-face');
         } else {
           router.replace('/dashboard');
