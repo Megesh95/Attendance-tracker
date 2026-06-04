@@ -15,6 +15,8 @@ export type LoginResponse = {
   email?: string;
   role?: string;
   referenceImagePath?: string | null;
+  officeLatitude?: number | null;
+  officeLongitude?: number | null;
 };
 
 export async function login(

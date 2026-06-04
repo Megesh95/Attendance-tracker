@@ -1,6 +1,4 @@
 import {
-  OFFICE_LATITUDE,
-  OFFICE_LONGITUDE,
   OFFICE_RADIUS_METERS,
 } from '@/constants/office';
 
@@ -27,13 +25,15 @@ export function getDistanceFromLatLonInMeters(
 
 export function getDistanceFromOffice(
   latitude: number,
-  longitude: number
+  longitude: number,
+  officeLatitude: number,
+  officeLongitude: number
 ): number {
   return getDistanceFromLatLonInMeters(
     latitude,
     longitude,
-    OFFICE_LATITUDE,
-    OFFICE_LONGITUDE
+    officeLatitude,
+    officeLongitude
   );
 }
 
@@ -46,23 +46,31 @@ export function formatDistance(meters: number): string {
 
 export function isWithinOfficeRadius(
   latitude: number,
-  longitude: number
+  longitude: number,
+  officeLatitude: number,
+  officeLongitude: number
 ): boolean {
   return (
-    getDistanceFromOffice(latitude, longitude) <= OFFICE_RADIUS_METERS
+    getDistanceFromOffice(latitude, longitude, officeLatitude, officeLongitude) <= OFFICE_RADIUS_METERS
   );
 }
 
 export function getAttendanceStatusLabel(
   latitude: number | null,
   longitude: number | null,
+  officeLatitude: number | null,
+  officeLongitude: number | null,
   isLoading: boolean
 ): string {
   if (isLoading || latitude === null || longitude === null) {
     return 'Fetching your location…';
   }
 
-  if (isWithinOfficeRadius(latitude, longitude)) {
+  if (officeLatitude === null || officeLongitude === null) {
+    return 'Office location not assigned';
+  }
+
+  if (isWithinOfficeRadius(latitude, longitude, officeLatitude, officeLongitude)) {
     return 'Within office range — ready to register';
   }
 

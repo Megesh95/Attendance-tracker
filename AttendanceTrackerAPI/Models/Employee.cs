@@ -14,6 +14,10 @@ public class Employee
 
     public DateTime CreatedAt { get; set; }
 
+    public decimal? OfficeLatitude { get; set; }
+
+    public decimal? OfficeLongitude { get; set; }
+
     // Employee registered biometric face reference image (nullable until first registration).
     public string? ReferenceImagePath { get; set; }
 

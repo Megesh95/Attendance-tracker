@@ -10,20 +10,17 @@ namespace AttendanceTrackerAPI.Controllers;
 [Route("api/[controller]")]
 public class AttendanceController : ControllerBase
 {
-    private const double OfficeLat = 13.15227027680566;
-    private const double OfficeLng = 77.55625239544804;
-    // private const double OfficeLat = 12.78672089977720;
-    // private const double OfficeLng = 77.8043905557959;
 
-    private const double OfficeRadiusMeters = 500;
 
     private readonly AppDbContext _context;
     private readonly IDeepFaceVerifierService _deepFaceVerifier;
+    private readonly IConfiguration _configuration;
 
-    public AttendanceController(AppDbContext context, IDeepFaceVerifierService deepFaceVerifier)
+    public AttendanceController(AppDbContext context, IDeepFaceVerifierService deepFaceVerifier, IConfiguration configuration)
     {
         _context = context;
         _deepFaceVerifier = deepFaceVerifier;
+        _configuration = configuration;
     }
 
     [HttpPost("office")]
@@ -41,21 +38,6 @@ public class AttendanceController : ControllerBase
             });
         }
 
-        var distance = CalculateDistance(
-            request.Latitude,
-            request.Longitude,
-            OfficeLat,
-            OfficeLng);
-
-        if (distance > OfficeRadiusMeters)
-        {
-            return BadRequest(new
-            {
-                success = false,
-                message = "Outside Office Range"
-            });
-        }
-
         var employee = await _context.Employees
             .FirstOrDefaultAsync(e => e.Id == request.EmployeeId);
 
@@ -65,6 +47,34 @@ public class AttendanceController : ControllerBase
             {
                 success = false,
                 message = "Employee not found"
+            });
+        }
+
+        if (!employee.OfficeLatitude.HasValue || !employee.OfficeLongitude.HasValue)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Office location not assigned. Please contact administrator."
+            });
+        }
+
+        var configuredRadius = _configuration.GetValue<double>("AttendanceSettings:OfficeRadiusMeters", 500);
+
+        var distance = CalculateDistance(
+            request.Latitude,
+            request.Longitude,
+            (double)employee.OfficeLatitude.Value,
+            (double)employee.OfficeLongitude.Value);
+
+        if (distance > configuredRadius)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                locationVerified = false,
+                distanceInMeters = distance,
+                message = $"You are not within {configuredRadius} meters of your registered office location."
             });
         }
 

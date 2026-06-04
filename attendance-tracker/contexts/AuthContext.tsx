@@ -13,6 +13,8 @@ type AuthSession = {
   email: string;
   role: string;
   referenceImagePath: string | null;
+  officeLatitude: number | null;
+  officeLongitude: number | null;
 };
 
 type AuthContextValue = {
@@ -21,6 +23,8 @@ type AuthContextValue = {
   employeeEmail: string | null;
   employeeRole: string | null;
   referenceImagePath: string | null;
+  officeLatitude: number | null;
+  officeLongitude: number | null;
   setSession: (session: AuthSession) => void;
   setReferenceImagePath: (path: string | null) => void;
   clearSession: () => void;
@@ -36,6 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [referenceImagePath, setReferenceImagePath] = useState<string | null>(
     null
   );
+  const [officeLatitude, setOfficeLatitude] = useState<number | null>(null);
+  const [officeLongitude, setOfficeLongitude] = useState<number | null>(null);
 
   const setSession = useCallback((session: AuthSession) => {
     setEmployeeId(session.employeeId);
@@ -43,6 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEmployeeEmail(session.email);
     setEmployeeRole(session.role);
     setReferenceImagePath(session.referenceImagePath);
+    setOfficeLatitude(session.officeLatitude);
+    setOfficeLongitude(session.officeLongitude);
   }, []);
 
   const clearSession = useCallback(() => {
@@ -51,6 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEmployeeEmail(null);
     setEmployeeRole(null);
     setReferenceImagePath(null);
+    setOfficeLatitude(null);
+    setOfficeLongitude(null);
   }, []);
 
   const value = useMemo(
@@ -60,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       employeeEmail,
       employeeRole,
       referenceImagePath,
+      officeLatitude,
+      officeLongitude,
       setSession,
       setReferenceImagePath,
       clearSession,
@@ -70,6 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       employeeEmail,
       employeeRole,
       referenceImagePath,
+      officeLatitude,
+      officeLongitude,
       setSession,
       clearSession,
     ]

@@ -49,6 +49,12 @@ public class AppDbContext : DbContext
             entity.Property(e => e.ReferenceImagePath)
                 .HasMaxLength(255);
 
+            entity.Property(e => e.OfficeLatitude)
+                .HasPrecision(18, 8);
+
+            entity.Property(e => e.OfficeLongitude)
+                .HasPrecision(18, 8);
+
             entity.HasMany(e => e.Attendances)
                 .WithOne(a => a.Employee)
                 .HasForeignKey(a => a.EmployeeId)

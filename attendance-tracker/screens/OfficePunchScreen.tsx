@@ -16,10 +16,7 @@ import { Image } from 'expo-image';
 
 import { useAttendance } from '@/contexts/AttendanceContext';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  OFFICE_LATITUDE,
-  OFFICE_LONGITUDE,
-} from '@/constants/office';
+
 import {
   punchOfficeAttendanceWithSelfie,
   getAttendanceErrorMessage,
@@ -31,16 +28,11 @@ import {
   isWithinOfficeRadius,
 } from '@/utils/location';
 
-const OFFICE_REGION: Region = {
-  latitude: OFFICE_LATITUDE,
-  longitude: OFFICE_LONGITUDE,
-  latitudeDelta: 0.01,
-  longitudeDelta: 0.01,
-};
+
 
 export default function OfficePunchScreen() {
   const { markOfficeCheckIn } = useAttendance();
-  const { employeeId } = useAuth();
+  const { employeeId, officeLatitude, officeLongitude } = useAuth();
   const mapRef = useRef<MapView>(null);
   const cameraRef = useRef<CameraView>(null);
 
@@ -55,18 +47,22 @@ export default function OfficePunchScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const distanceMeters =
-    latitude !== null && longitude !== null
-      ? getDistanceFromOffice(latitude, longitude)
+    latitude !== null && longitude !== null && officeLatitude !== null && officeLongitude !== null
+      ? getDistanceFromOffice(latitude, longitude, officeLatitude, officeLongitude)
       : null;
 
   const withinRange =
     latitude !== null &&
     longitude !== null &&
-    isWithinOfficeRadius(latitude, longitude);
+    officeLatitude !== null &&
+    officeLongitude !== null &&
+    isWithinOfficeRadius(latitude, longitude, officeLatitude, officeLongitude);
 
   const statusLabel = getAttendanceStatusLabel(
     latitude,
     longitude,
+    officeLatitude,
+    officeLongitude,
     isLoadingLocation
   );
 
@@ -96,24 +92,33 @@ export default function OfficePunchScreen() {
       setLatitude(lat);
       setLongitude(lng);
 
-      mapRef.current?.fitToCoordinates(
-        [
-          { latitude: lat, longitude: lng },
+      if (officeLatitude !== null && officeLongitude !== null) {
+        mapRef.current?.fitToCoordinates(
+          [
+            { latitude: lat, longitude: lng },
+            {
+              latitude: officeLatitude,
+              longitude: officeLongitude,
+            },
+          ],
           {
-            latitude: OFFICE_LATITUDE,
-            longitude: OFFICE_LONGITUDE,
-          },
-        ],
-        {
-          edgePadding: {
-            top: 80,
-            right: 48,
-            bottom: 280,
-            left: 48,
-          },
-          animated: true,
-        }
-      );
+            edgePadding: {
+              top: 80,
+              right: 48,
+              bottom: 280,
+              left: 48,
+            },
+            animated: true,
+          }
+        );
+      } else {
+        mapRef.current?.animateToRegion({
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      }
     } catch {
       Alert.alert(
         'Location Error',
@@ -150,7 +155,15 @@ export default function OfficePunchScreen() {
       return;
     }
 
-    if (!isWithinOfficeRadius(latitude, longitude)) {
+    if (officeLatitude === null || officeLongitude === null) {
+      Alert.alert(
+        'Location Not Assigned',
+        'No office location is assigned to your account. Please contact your administrator.'
+      );
+      return;
+    }
+
+    if (!isWithinOfficeRadius(latitude, longitude, officeLatitude, officeLongitude)) {
       Alert.alert(
         'Outside Office Range',
         'You must be within the office radius to register attendance.'
@@ -311,7 +324,16 @@ export default function OfficePunchScreen() {
         <MapView
           ref={mapRef}
           style={styles.map}
-          initialRegion={OFFICE_REGION}
+          initialRegion={
+            officeLatitude !== null && officeLongitude !== null
+              ? {
+                  latitude: officeLatitude,
+                  longitude: officeLongitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }
+              : undefined
+          }
           showsUserLocation
           showsMyLocationButton={false}
         >
@@ -322,14 +344,16 @@ export default function OfficePunchScreen() {
               pinColor="#2563EB"
             />
           )}
-          <Marker
-            coordinate={{
-              latitude: OFFICE_LATITUDE,
-              longitude: OFFICE_LONGITUDE,
-            }}
-            title="Office"
-            pinColor="#059669"
-          />
+          {officeLatitude !== null && officeLongitude !== null && (
+            <Marker
+              coordinate={{
+                latitude: officeLatitude,
+                longitude: officeLongitude,
+              }}
+              title="Office"
+              pinColor="#059669"
+            />
+          )}
         </MapView>
 
         {isLoadingLocation && (

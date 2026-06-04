@@ -20,6 +20,8 @@ type LoginSession = {
   email: string;
   role: string;
   referenceImagePath: string | null;
+  officeLatitude: number | null;
+  officeLongitude: number | null;
 };
 
 type LoginScreenProps = {
@@ -57,6 +59,8 @@ export default function LoginScreen({
         role: result.role ?? 'Employee',
         referenceImagePath:
           result.referenceImagePath ?? null,
+        officeLatitude: result.officeLatitude ?? null,
+        officeLongitude: result.officeLongitude ?? null,
       });
     } catch (error) {
       Alert.alert('Login Failed', getAuthErrorMessage(error));

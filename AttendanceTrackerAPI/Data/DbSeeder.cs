@@ -47,6 +47,8 @@ public static class DbSeeder
             if (existing is null)
             {
                 seed.ReferenceImagePath = null;
+                seed.OfficeLatitude = 13.15227027680566m;
+                seed.OfficeLongitude = 77.55625239544804m;
                 context.Employees.Add(seed);
                 continue;
             }
@@ -56,6 +58,8 @@ public static class DbSeeder
             existing.PasswordHash = seed.PasswordHash;
             existing.Role = seed.Role;
             existing.CreatedAt = existing.CreatedAt == default ? now : existing.CreatedAt;
+            existing.OfficeLatitude ??= 13.15227027680566m;
+            existing.OfficeLongitude ??= 77.55625239544804m;
         }
 
         await context.SaveChangesAsync();

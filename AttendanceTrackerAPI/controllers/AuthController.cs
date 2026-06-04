@@ -73,7 +73,9 @@ public class AuthController : ControllerBase
             name = employee.Name,
             email = employee.Email,
             role = employee.Role,
-            referenceImagePath = employee.ReferenceImagePath
+            referenceImagePath = employee.ReferenceImagePath,
+            officeLatitude = employee.OfficeLatitude,
+            officeLongitude = employee.OfficeLongitude
         });
     }
 
