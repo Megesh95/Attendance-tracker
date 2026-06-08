@@ -47,3 +47,17 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     throw error;
   }
 }
+
+export function getExportAttendanceUrl(
+  search?: string,
+  department?: string,
+  date?: string,
+  employeeId?: number
+): string {
+  const url = new URL(`${API_BASE_URL}/api/admin/export`);
+  if (search) url.searchParams.append('search', search);
+  if (department) url.searchParams.append('department', department);
+  if (date) url.searchParams.append('date', date);
+  if (employeeId) url.searchParams.append('employeeId', employeeId.toString());
+  return url.toString();
+}

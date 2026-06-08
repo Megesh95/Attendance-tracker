@@ -22,6 +22,9 @@ const MAPPING = {
   'eye': 'visibility',
   'magnifyingglass': 'search',
   'xmark': 'close',
+  'arrow.down.doc': 'file-download',
+  'arrow.down.doc.fill': 'file-download',
+  'building.2': 'business',
 } as IconMapping;
 
 /**

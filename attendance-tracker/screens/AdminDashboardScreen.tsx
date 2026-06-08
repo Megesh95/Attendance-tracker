@@ -12,9 +12,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { getAdminDashboardData, type EmployeeWithAttendances, type AttendanceRecord } from '@/services/adminApi';
+import { getAdminDashboardData, getExportAttendanceUrl, type EmployeeWithAttendances, type AttendanceRecord } from '@/services/adminApi';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { colors } from '@/constants/colors';
 
@@ -25,6 +27,7 @@ export default function AdminDashboardScreen() {
   const [error, setError] = useState<string | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithAttendances | null>(null);
 
   useEffect(() => {
@@ -43,6 +46,33 @@ export default function AdminDashboardScreen() {
       }
     } catch (err: any) {
       setError(err.message || 'Error loading dashboard data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownload = async (type: 'today' | 'history', employeeId?: number) => {
+    try {
+      setIsLoading(true);
+      let dateParam = undefined;
+      if (type === 'today') {
+        dateParam = new Date().toISOString().split('T')[0];
+      }
+
+      const url = getExportAttendanceUrl(searchQuery, departmentFilter, dateParam, employeeId);
+      const filename = `Attendance_${type}_${Date.now()}.xlsx`;
+      const file = new File(Paths.document, filename);
+
+      await File.downloadFileAsync(url, file);
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri);
+      } else {
+        alert('Sharing is not available on this device');
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download report');
     } finally {
       setIsLoading(false);
     }
@@ -80,10 +110,17 @@ export default function AdminDashboardScreen() {
 
   // Filtered list
   const filteredEmployees = useMemo(() => {
-    if (!searchQuery.trim()) return employees;
-    const query = searchQuery.toLowerCase();
-    return employees.filter(e => e.name.toLowerCase().includes(query));
-  }, [employees, searchQuery]);
+    let result = employees;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(e => e.name.toLowerCase().includes(query));
+    }
+    if (departmentFilter.trim()) {
+      const dept = departmentFilter.toLowerCase();
+      result = result.filter(e => e.role.toLowerCase().includes(dept));
+    }
+    return result;
+  }, [employees, searchQuery, departmentFilter]);
 
   const renderEmployeeRow = ({ item }: { item: EmployeeWithAttendances }) => {
     const present = isPresentToday(item.attendances);
@@ -93,7 +130,7 @@ export default function AdminDashboardScreen() {
         <Text style={[styles.cell, styles.cellId]}>{item.id}</Text>
         <Text style={[styles.cell, styles.cellName]} numberOfLines={1}>{item.name}</Text>
         <Text style={[styles.cell, styles.cellDept]} numberOfLines={1}>{item.role}</Text>
-        <View style={[styles.cell, styles.cellStatus]}>
+        <View style={styles.cellStatus}>
           <View style={[styles.statusBadge, present ? styles.statusPresent : styles.statusAbsent]}>
             <Text style={[styles.statusText, present ? styles.statusTextPresent : styles.statusTextAbsent]}>
               {present ? 'Present' : 'Absent'}
@@ -101,7 +138,7 @@ export default function AdminDashboardScreen() {
           </View>
         </View>
         <TouchableOpacity 
-          style={[styles.cell, styles.cellView]} 
+          style={styles.cellView} 
           onPress={() => setSelectedEmployee(item)}
         >
           <IconSymbol name="eye" size={20} color={colors.primary} />
@@ -151,16 +188,39 @@ export default function AdminDashboardScreen() {
         </View>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <IconSymbol name="magnifyingglass" size={20} color={colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search Employee..."
-          placeholderTextColor={colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
+      {/* Search Bar & Filters */}
+      <View style={styles.filterContainer}>
+        <View style={styles.searchContainer}>
+          <IconSymbol name="magnifyingglass" size={20} color={colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search Name..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <View style={styles.searchContainer}>
+          <IconSymbol name="building.2" size={20} color={colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Filter Dept..."
+            placeholderTextColor={colors.textMuted}
+            value={departmentFilter}
+            onChangeText={setDepartmentFilter}
+          />
+        </View>
+      </View>
+
+      <View style={styles.exportButtonsContainer}>
+        <TouchableOpacity style={styles.exportButton} onPress={() => handleDownload('today')}>
+          <IconSymbol name="arrow.down.doc" size={16} color={colors.primaryContrast} />
+          <Text style={styles.exportButtonText}>Export Today</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.exportButton} onPress={() => handleDownload('history')}>
+          <IconSymbol name="arrow.down.doc.fill" size={16} color={colors.primaryContrast} />
+          <Text style={styles.exportButtonText}>Export History</Text>
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.sectionTitle}>Employee List</Text>
@@ -207,7 +267,13 @@ export default function AdminDashboardScreen() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{selectedEmployee?.name}'s Attendance</Text>
+            <View>
+              <Text style={styles.modalTitle}>{selectedEmployee?.name}'s Attendance</Text>
+              <TouchableOpacity style={styles.modalExportButton} onPress={() => handleDownload('history', selectedEmployee?.id)}>
+                <IconSymbol name="arrow.down.doc.fill" size={14} color={colors.primary} />
+                <Text style={styles.modalExportButtonText}>Export Records</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity onPress={() => setSelectedEmployee(null)} style={styles.closeButton}>
               <IconSymbol name="xmark" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
@@ -311,17 +377,43 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
+  filterContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    gap: 8,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    marginHorizontal: 16,
-    marginBottom: 16,
     paddingHorizontal: 12,
     borderRadius: 12,
     height: 48,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  exportButtonsContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  exportButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  exportButtonText: {
+    color: colors.primaryContrast,
+    fontSize: 14,
+    fontWeight: '600',
   },
   searchInput: {
     flex: 1,
@@ -453,6 +545,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  modalExportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  modalExportButtonText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '500',
   },
   closeButton: {
     padding: 4,
