@@ -64,7 +64,6 @@ export default function DashboardScreen({
     attendanceStatus,
     attendanceInfo,
     attendanceHistory,
-    markOffSiteCheckIn,
     setHistory,
     setTodayStatus,
   } = useAttendance();
@@ -134,11 +133,7 @@ export default function DashboardScreen({
   };
 
   const handlePunchOffSite = () => {
-    markOffSiteCheckIn();
-    Alert.alert(
-      'Attendance',
-      'Off-site attendance marked successfully'
-    );
+    router.push('/offsite-punch');
   };
 
   const handleAttendanceHistory = () => {

@@ -166,6 +166,122 @@ public class AttendanceController : ControllerBase
         });
     }
 
+    [HttpPost("offsite")]
+    [RequestSizeLimit(20_000_000)]
+    public async Task<IActionResult> MarkOffSiteAttendance(
+        [FromForm] AttendanceRequest request,
+        [FromForm] IFormFile selfie)
+    {
+        if (selfie is null || selfie.Length == 0)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Selfie image is required"
+            });
+        }
+
+        var employee = await _context.Employees
+            .FirstOrDefaultAsync(e => e.Id == request.EmployeeId);
+
+        if (employee is null)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Employee not found"
+            });
+        }
+
+        var uploadsRoot = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+        var employeeDir = Path.Combine(uploadsRoot, "attendance", employee.Id.ToString());
+        Directory.CreateDirectory(employeeDir);
+
+        var ext = Path.GetExtension(selfie.FileName);
+        if (string.IsNullOrWhiteSpace(ext))
+            ext = ".jpg";
+
+        var punchTime = DateTime.Now;
+        var fileName = $"selfie_{punchTime:yyyyMMdd_HHmmss}{ext}";
+        var selfiePath = Path.Combine(employeeDir, fileName);
+
+        await using (var stream = System.IO.File.Create(selfiePath))
+        {
+            await selfie.CopyToAsync(stream);
+        }
+
+        bool faceVerified = false;
+        string attendanceStatus = "Rejected";
+        double? confidenceScore = null;
+
+        if (string.IsNullOrEmpty(employee.ReferenceImagePath))
+        {
+            // First time: Save as reference image
+            employee.ReferenceImagePath = selfiePath;
+            _context.Employees.Update(employee);
+            
+            faceVerified = true;
+            attendanceStatus = "Approved";
+        }
+        else
+        {
+            // Subsequent check-ins: Verify against reference
+            try
+            {
+                var result = await _deepFaceVerifier.VerifyAsync(employee.ReferenceImagePath, selfiePath, HttpContext.RequestAborted);
+                confidenceScore = result.ConfidenceScore;
+
+                if (result.Verified && confidenceScore >= 0.75)
+                {
+                    faceVerified = true;
+                    attendanceStatus = "Approved";
+                }
+                else
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "Face verification failed. Attendance not recorded."
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // DeepFace script failed (e.g., no face detected)
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Face not detected. Please retake the selfie."
+                });
+            }
+        }
+
+        var attendance = new Attendance
+        {
+            EmployeeId = request.EmployeeId,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            AttendanceType = request.AttendanceType,
+            CheckInTime = punchTime,
+            PunchTime = punchTime,
+            LocationVerified = false,
+            FaceVerified = faceVerified,
+            ConfidenceScore = confidenceScore,
+            Status = attendanceStatus,
+            SelfieImagePath = selfiePath
+        };
+
+        _context.Attendances.Add(attendance);
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = "Attendance Marked"
+        });
+    }
+
+
     private static double CalculateDistance(
         double lat1,
         double lon1,

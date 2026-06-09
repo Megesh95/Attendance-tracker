@@ -54,6 +54,44 @@ export async function punchOfficeAttendanceWithSelfie(
   return data;
 }
 
+export async function punchOffSiteAttendanceWithSelfie(
+  params: PunchOfficeWithSelfieParams
+): Promise<AttendanceResponse> {
+  const {
+    employeeId = DEFAULT_EMPLOYEE_ID,
+    latitude,
+    longitude,
+    selfieUri,
+    attendanceType = 'Off-Site',
+  } = params;
+
+  const formData = new FormData();
+  formData.append('employeeId', String(employeeId));
+  formData.append('latitude', String(latitude));
+  formData.append('longitude', String(longitude));
+  formData.append('attendanceType', attendanceType);
+
+  formData.append(
+    'selfie',
+    {
+      uri: selfieUri,
+      type: 'image/jpeg',
+      name: 'selfie.jpg',
+    } as any
+  );
+
+  const { data } = await axios.post<AttendanceResponse>(
+    `${API_BASE_URL}/api/attendance/offsite`,
+    formData,
+    {
+      timeout: 30000,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+
+  return data;
+}
+
 export function getAttendanceErrorMessage(error: unknown): string {
   if (isAxiosError(error)) {
     return (
